@@ -3,7 +3,9 @@
 import { generateObject, APICallError } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
-
+console.log(process.env.SILICONFLOW_API_KEY)
+console.log(process.env.SILICONFLOW_BASE_URL)
+console.log(process.env.SILICONFLOW_MODEL)
 // 创建硅基流动客户端
 const siliconflow = createOpenAI({
   apiKey: process.env.SILICONFLOW_API_KEY,
@@ -47,6 +49,8 @@ export async function generateOutlineAction(config: string | GenerateOutlineConf
   console.log("正在生成大纲，用户输入:", userInput);
   console.log("目标年龄:", targetAudience);
   console.log("主角描述:", mainCharacterDesc);
+
+  console.log('model', siliconflow.languageModel)
 
   try {
     const { object } = await generateObject({
