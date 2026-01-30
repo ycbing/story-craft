@@ -1,27 +1,41 @@
-'use server'
+"use server";
 
-import { generateObject } from 'ai'
-import { openai } from '@ai-sdk/openai'
-import { z } from 'zod'
+import { generateObject, APICallError } from "ai";
+import { createOpenAI } from "@ai-sdk/openai";
+import { z } from "zod";
+
+// 创建硅基流动客户端
+const siliconflow = createOpenAI({
+  apiKey: process.env.SILICONFLOW_API_KEY,
+  baseURL: process.env.SILICONFLOW_BASE_URL || "https://api.siliconflow.com/v1",
+});
 
 // 定义我们期望 AI 返回的数据结构 (Schema)
 // 这就像是给 AI 填的一张“表格”，它必须填满，不能乱写
 const storySchema = z.object({
   title: z.string().describe("根据剧情生成的绘本标题"),
-  pages: z.array(z.object({
-    pageNumber: z.number(),
-    summary: z.string().describe("这一页的剧情梗概，包含主角动作和环境描述"),
-  })).length(8) // 强制要求生成 8 页
-})
+  pages: z
+    .array(
+      z.object({
+        pageNumber: z.number(),
+        summary: z
+          .string()
+          .describe("这一页的剧情梗概，包含主角动作和环境描述"),
+      }),
+    )
+    .length(8), // 强制要求生成 8 页
+});
 
 export async function generateOutlineAction(userInput: string) {
-  'use server'
-  
-  console.log("正在生成大纲，用户输入:", userInput)
+  "use server";
+
+  console.log("正在生成大纲，用户输入:", userInput);
 
   try {
     const { object } = await generateObject({
-      model: openai('THUDM/GLM-Z1-9B-0414'), // 或者 'gpt-3.5-turbo' (便宜点)
+      model: siliconflow.chat(
+        process.env.SILICONFLOW_MODEL! || "gpt-3.5-turbo",
+      ), // 或者 'gpt-3.5-turbo' (便宜点)
       schema: storySchema,
       prompt: `
         你是一位专业的儿童绘本作家。请根据用户的创意：“${userInput}”，创作一个适合 3-6 岁儿童阅读的绘本大纲。
@@ -31,12 +45,14 @@ export async function generateOutlineAction(userInput: string) {
         2. 将故事拆分为严格的 8 个画面场景。
         3. 不要直接写对白，而是描述画面发生了什么 (例如：'小猫在雨中哭泣' 而不是 '小猫说：我好难过')。
       `,
-    })
+    });
 
-    return { success: true, data: object }
-
+    return { success: true, data: object };
   } catch (error) {
-    console.error("AI 生成失败:", error)
-    return { success: false, error: "生成失败，请重试" }
+    console.error("AI 生成失败:", error);
+    if (APICallError.isInstance(error)) {
+      console.log("具体错误信息:", error);
+    }
+    return { success: false, error: "生成失败，请重试" };
   }
 }
