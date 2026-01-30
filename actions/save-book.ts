@@ -1,20 +1,23 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { books, pages } from "@/lib/db/schema"; // 引入我们之前定义的表
+import { books, pages } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { auth } from "@clerk/nextjs"; // 假设你用了 Clerk，没用可以暂时 mock
 
 // 定义前端传来的数据结构
-interface SaveBookParams {
+export interface SaveBookParams {
   bookId?: string; // 如果有 ID 说明是更新，没有说明是新建
   title: string;
+  stylePrompt?: string; // 艺术风格
+  mainCharacterDesc?: string; // 主角描述
   pagesData: {
     pageNumber: number;
     aiText: string;
     aiImageUrl: string | null;
-    canvasJson: any; // Fabric 的 JSON
+    canvasJson: Record<string, unknown> | null;
+    outlineSummary?: string;
   }[];
+  status?: "draft" | "completed"; // 绘本状态
 }
 
 export async function saveBookAction(params: SaveBookParams) {
@@ -41,7 +44,9 @@ export async function saveBookAction(params: SaveBookParams) {
           .values({
             userId: userId,
             title: params.title,
-            status: "draft",
+            stylePrompt: params.stylePrompt,
+            mainCharacterDesc: params.mainCharacterDesc,
+            status: params.status || "draft",
           })
           .returning({ id: books.id }); // 拿到新生成的 UUID
 
@@ -52,6 +57,9 @@ export async function saveBookAction(params: SaveBookParams) {
           .update(books)
           .set({
             title: params.title,
+            stylePrompt: params.stylePrompt,
+            mainCharacterDesc: params.mainCharacterDesc,
+            status: params.status || "draft",
             updatedAt: new Date(),
           })
           .where(eq(books.id, currentBookId));
@@ -71,6 +79,7 @@ export async function saveBookAction(params: SaveBookParams) {
           params.pagesData.map((p) => ({
             bookId: currentBookId!, // 确保不为空
             pageNumber: p.pageNumber,
+            prompt: p.outlineSummary || "", // 存储原始摘要
             aiText: p.aiText,
             aiImageUrl: p.aiImageUrl,
             canvasState: p.canvasJson, // 存入 Postgres 的 jsonb 字段

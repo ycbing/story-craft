@@ -26,10 +26,27 @@ const storySchema = z.object({
     .length(8), // 强制要求生成 8 页
 });
 
-export async function generateOutlineAction(userInput: string) {
+// 定义配置参数接口
+export interface GenerateOutlineConfig {
+  userInput: string;
+  targetAudience?: string;
+  mainCharacterDesc?: string;
+  stylePrompt?: string;
+}
+
+export async function generateOutlineAction(config: string | GenerateOutlineConfig) {
   "use server";
 
+  // 兼容旧的调用方式（只传字符串）
+  const params = typeof config === "string"
+    ? { userInput: config }
+    : config;
+
+  const { userInput, targetAudience = "3-6", mainCharacterDesc = "", stylePrompt = "" } = params;
+
   console.log("正在生成大纲，用户输入:", userInput);
+  console.log("目标年龄:", targetAudience);
+  console.log("主角描述:", mainCharacterDesc);
 
   try {
     const { object } = await generateObject({
@@ -38,12 +55,17 @@ export async function generateOutlineAction(userInput: string) {
       ), // 或者 'gpt-3.5-turbo' (便宜点)
       schema: storySchema,
       prompt: `
-        你是一位专业的儿童绘本作家。请根据用户的创意：“${userInput}”，创作一个适合 3-6 岁儿童阅读的绘本大纲。
-        
+        你是一位专业的儿童绘本作家。请根据用户的创意："${userInput}"，创作一个适合 ${targetAudience} 岁儿童阅读的绘本大纲。
+
+        ${mainCharacterDesc ? `**主角设定**: ${mainCharacterDesc}\n请确保主角在整个故事中保持一致。` : ""}
+
+        ${stylePrompt ? `**艺术风格**: ${stylePrompt}\n请在场景描述中考虑这种风格的视觉特点。` : ""}
+
         要求：
         1. 故事要有起承转合，结局温馨。
         2. 将故事拆分为严格的 8 个画面场景。
         3. 不要直接写对白，而是描述画面发生了什么 (例如：'小猫在雨中哭泣' 而不是 '小猫说：我好难过')。
+        4. 每一页的描述应该足够具体，便于后续生成图片。
       `,
     });
 
