@@ -23,7 +23,7 @@ export interface SaveBookParams {
 export async function saveBookAction(params: SaveBookParams) {
   // 1. 权限检查 (如果没有 Clerk，暂时硬编码一个 userId)
   // const { userId } = auth();
-  const userId = "user_2bXyZ..."; // ⚠️ 测试阶段先写死一个 ID
+  const userId = "user_2bXyZ_test"; // ⚠️ 测试阶段先写死一个 ID
 
   if (!userId) return { success: false, error: "未登录" };
 

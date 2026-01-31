@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Library } from "lucide-react";
 
 export function Header() {
   return (
@@ -21,6 +21,13 @@ export function Header() {
 
           {/* 导航链接 */}
           <nav className="hidden md:flex items-center gap-8">
+            <Link
+              href="/dashboard"
+              className="text-gray-600 hover:text-amber-700 dark:text-gray-400 dark:hover:text-amber-400 transition-colors flex items-center gap-1"
+            >
+              <Library className="w-4 h-4" />
+              我的作品
+            </Link>
             <Link
               href="#features"
               className="text-gray-600 hover:text-amber-700 dark:text-gray-400 dark:hover:text-amber-400 transition-colors"

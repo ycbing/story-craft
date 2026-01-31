@@ -7,7 +7,7 @@ import React, {
   forwardRef,
   useState,
 } from "react";
-import * as fabric from "fabric";
+import * as fabric from "fabric"; // 确保安装的是 fabric v6
 
 interface CanvasEditorProps {
   initialImageUrl: string | null;
@@ -20,13 +20,11 @@ interface CanvasEditorProps {
   className?: string;
 }
 
-// 定义暴露给父组件的方法
 export interface CanvasEditorRef {
   saveToJson: () => Record<string, unknown> | null;
   getCanvas: () => fabric.Canvas | null;
 }
 
-// 使用 forwardRef 包裹组件
 const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
   (
     {
@@ -43,10 +41,10 @@ const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
   ) => {
     const canvasEl = useRef<HTMLCanvasElement>(null);
     const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
+    const [isReady, setIsReady] = useState(false); // 标记 Canvas 是否初始化完成
     const [isLoading, setIsLoading] = useState(true);
-    const [imageError, setImageError] = useState(false);
 
-    // 暴露方法给父组件
+    // 暴露方法
     useImperativeHandle(ref, () => ({
       saveToJson: () => {
         if (!fabricCanvasRef.current) return null;
@@ -55,223 +53,127 @@ const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
       getCanvas: () => fabricCanvasRef.current,
     }));
 
+    // 1. 初始化 Fabric Canvas 引擎 (仅在挂载时执行一次)
     useEffect(() => {
       if (!canvasEl.current) return;
 
-      // 防止重复初始化
-      if (fabricCanvasRef.current) {
-        fabricCanvasRef.current.dispose();
-      }
-
-      // 确保画布元素有正确的尺寸
-      const canvasElement = canvasEl.current;
-      if (!canvasElement.width) {
-        canvasElement.width = width;
-      }
-      if (!canvasElement.height) {
-        canvasElement.height = height;
-      }
-
-      // 使用 requestAnimationFrame 确保 DOM 完全渲染后再初始化
-      const initTimer = requestAnimationFrame(() => {
-        try {
-          const canvas = new fabric.Canvas(canvasElement, {
-            width,
-            height,
-            backgroundColor: "#fff",
-            selection: !readOnly,
-          });
-
-          // 设置只读模式
-          if (readOnly) {
-            canvas.defaultCursor = "default";
-            canvas.selectionColor = "transparent";
-            canvas.selectionBorderColor = "transparent";
-          }
-
-          fabricCanvasRef.current = canvas;
-
-          // 加载内容的函数
-          const loadContent = async () => {
-            setIsLoading(true);
-            setImageError(false);
-
-            try {
-              if (initialJson) {
-                // A. 如果有存档，直接加载 JSON
-                console.log("加载已有 JSON 存档...");
-                canvas.loadFromJSON(initialJson, () => {
-                  canvas.requestRenderAll();
-                  // 恢复正片叠底等特殊属性
-                  canvas.getObjects().forEach((obj: any) => {
-                    if (obj.type === "image") obj.globalCompositeOperation = "multiply";
-                    if (readOnly) {
-                      obj.selectable = false;
-                      obj.evented = false;
-                    }
-                  });
-                  setIsLoading(false);
-                });
-              } else if (initialImageUrl) {
-                // B. 加载新图片和文字
-                console.log("加载 AI 新素材...");
-
-                // 使用代理 API 避免跨域问题
-                try {
-                  const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(initialImageUrl)}`;
-                  const img = await fabric.Image.fromURL(proxyUrl, {
-                    crossOrigin: "anonymous",
-                  });
-
-                  if (!img) {
-                    setImageError(true);
-                    setIsLoading(false);
-                    return;
-                  }
-
-                  // 计算缩放比例，使图片适应画布
-                  const canvasWidth = canvas.width || width;
-                  const canvasHeight = canvas.height || height;
-                  const scale = Math.min(
-                    canvasWidth / (img.width || 1),
-                    canvasHeight / (img.height || 1)
-                  );
-
-                  img.scale(scale * 0.9);
-                  img.set({
-                    originX: "center",
-                    originY: "center",
-                    left: canvasWidth / 2,
-                    top: canvasHeight / 2,
-                    globalCompositeOperation: "multiply",
-                    selectable: !readOnly,
-                    evented: !readOnly,
-                  });
-
-                  canvas.add(img);
-
-                  // 添加文字
-                  if (initialText) {
-                    const textbox = new fabric.Textbox(initialText, {
-                      top: canvasHeight - 100,
-                      left: canvasWidth / 2,
-                      originX: "center",
-                      width: canvasWidth * 0.8,
-                      fontSize: 24,
-                      textAlign: "center",
-                      fill: "#333",
-                      backgroundColor: "rgba(255, 255, 255, 0.7)",
-                      padding: 10,
-                      selectable: !readOnly,
-                      evented: !readOnly,
-                    });
-                    canvas.add(textbox);
-                  }
-
-                  canvas.requestRenderAll();
-                  setIsLoading(false);
-
-                  if (onCanvasChange) {
-                    onCanvasChange(canvas.toJSON());
-                  }
-                } catch (error) {
-                  console.error("加载图片失败:", error);
-                  setImageError(true);
-                  setIsLoading(false);
-                }
-              } else {
-                setIsLoading(false);
-              }
-            } catch (error) {
-              console.error("加载画布内容失败:", error);
-              setImageError(true);
-              setIsLoading(false);
-            }
-          };
-
-          loadContent();
-
-          // 监听画布变化（仅在非只读模式）
-          if (!readOnly && onCanvasChange) {
-            const handleChange = () => {
-              onCanvasChange(canvas.toJSON());
-            };
-            canvas.on("object:modified", handleChange);
-            canvas.on("object:added", handleChange);
-            canvas.on("object:removed", handleChange);
-
-            return () => {
-              canvas.off("object:modified", handleChange);
-              canvas.off("object:added", handleChange);
-              canvas.off("object:removed", handleChange);
-            };
-          }
-
-          return () => {
-            canvas.dispose();
-            fabricCanvasRef.current = null;
-          };
-        } catch (error) {
-          console.error("Fabric.js 初始化失败:", error);
-          setIsLoading(false);
-          setImageError(true);
-        }
+      console.log("初始化 Fabric 引擎...");
+      const canvas = new fabric.Canvas(canvasEl.current, {
+        width,
+        height,
+        backgroundColor: "#fff",
+        selection: !readOnly,
+        renderOnAddRemove: false, // 性能优化：关闭自动渲染，手动 requestRenderAll
       });
 
-      return () => {
-        cancelAnimationFrame(initTimer);
+      // 修复只读模式的光标
+      if (readOnly) {
+        canvas.defaultCursor = "default";
+        canvas.hoverCursor = "default";
+      }
+
+      fabricCanvasRef.current = canvas;
+      setIsReady(true); // 标记引擎就绪
+
+      // 绑定事件
+      const handleChange = () => {
+        if (!readOnly && onCanvasChange) {
+          onCanvasChange(canvas.toJSON());
+        }
       };
-    }, [width, height, readOnly, initialJson]);
 
-    // 当初始图片或文字变化时重新加载（仅在没有 JSON 存档时）
+      canvas.on("object:modified", handleChange);
+      canvas.on("object:added", handleChange);
+      canvas.on("object:removed", handleChange);
+
+      // 清理函数
+      return () => {
+        console.log("清理 Fabric 引擎...");
+        canvas.off("object:modified", handleChange);
+        canvas.off("object:added", handleChange);
+        canvas.off("object:removed", handleChange);
+        
+        // Fabric v6 dispose 是异步的，但 useEffect cleanup 是同步的
+        // 这里主要为了断开引用，具体 DOM 清理由 React 处理，
+        // 或者使用 dispose().then() 但要注意不要阻塞 UI
+        canvas.dispose(); 
+        fabricCanvasRef.current = null;
+        setIsReady(false);
+      };
+    }, []); // 空依赖数组，确保只运行一次
+
+    // 2. 加载内容 (当 Canvas 就绪 或 数据变化时执行)
     useEffect(() => {
-      if (!initialJson && fabricCanvasRef.current) {
-        const canvas = fabricCanvasRef.current;
-        canvas.clear();
-        canvas.backgroundColor = "#fff";
-        canvas.requestRenderAll();
+      if (!isReady || !fabricCanvasRef.current) return;
 
-        if (initialImageUrl) {
-          setIsLoading(true);
-          setImageError(false);
+      const canvas = fabricCanvasRef.current;
+      setIsLoading(true);
 
-          // 使用代理 API 避免跨域问题
-          const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(initialImageUrl)}`;
-          fabric.Image.fromURL(proxyUrl, {
-            crossOrigin: "anonymous",
-          }).then((img) => {
-            if (!img) {
-              setImageError(true);
-              setIsLoading(false);
-              return;
-            }
-
-            const canvasWidth = canvas.width || width;
-            const canvasHeight = canvas.height || height;
-            const scale = Math.min(
-              canvasWidth / (img.width || 1),
-              canvasHeight / (img.height || 1)
-            );
-
-            img.scale(scale * 0.9);
-            img.set({
-              originX: "center",
-              originY: "center",
-              left: canvasWidth / 2,
-              top: canvasHeight / 2,
-              globalCompositeOperation: "multiply",
-              selectable: !readOnly,
-              evented: !readOnly,
+      const loadContent = async () => {
+        try {
+          canvas.clear();
+          canvas.backgroundColor = "#fff"; // 清除后重置背景
+          
+          // A. 优先加载 JSON 存档
+          if (initialJson) {
+            console.log("加载 JSON...");
+            // 🔥 v6 修复：loadFromJSON 返回 Promise
+            await canvas.loadFromJSON(initialJson);
+            
+            // 恢复特殊属性
+            canvas.getObjects().forEach((obj) => {
+              if (obj.type === "image") {
+                // @ts-ignore: fabric v6 类型可能需要断言
+                obj.globalCompositeOperation = "multiply";
+              }
+              if (readOnly) {
+                obj.selectable = false;
+                obj.evented = false;
+              }
+            });
+          } 
+          // B. 加载新素材
+          else if (initialImageUrl) {
+            console.log("加载新素材...");
+            const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(initialImageUrl)}`;
+            
+            // 🔥 v6 修复：使用 await 并且没有 callback
+            const img = await fabric.Image.fromURL(proxyUrl, {
+              crossOrigin: "anonymous",
             });
 
-            canvas.add(img);
+            if (img) {
+              const canvasWidth = canvas.width || width;
+              const canvasHeight = canvas.height || height;
+              // 计算 cover 模式的缩放
+              const scaleX = canvasWidth / img.width!;
+              const scaleY = canvasHeight / img.height!;
+              const scale = Math.max(scaleX, scaleY); // Cover 模式用 max, Contain 用 min
 
+              img.set({
+                originX: "center",
+                originY: "center",
+                left: canvasWidth / 2,
+                top: canvasHeight / 2,
+                scaleX: scale,
+                scaleY: scale,
+                globalCompositeOperation: "multiply",
+                selectable: !readOnly,
+                evented: !readOnly,
+              });
+              
+              // 图片置底
+              canvas.add(img);
+              canvas.sendObjectToBack(img);
+            }
+
+            // 添加文字
             if (initialText) {
               const textbox = new fabric.Textbox(initialText, {
-                top: canvasHeight - 100,
-                left: canvasWidth / 2,
+                top: (canvas.height || height) - 100,
+                left: (canvas.width || width) / 2,
                 originX: "center",
-                width: canvasWidth * 0.8,
+                width: (canvas.width || width) * 0.8,
                 fontSize: 24,
                 textAlign: "center",
                 fill: "#333",
@@ -279,42 +181,35 @@ const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
                 padding: 10,
                 selectable: !readOnly,
                 evented: !readOnly,
+                splitByGrapheme: true, // 中文换行支持
               });
               canvas.add(textbox);
+              canvas.setActiveObject(textbox);
             }
+          }
 
-            canvas.requestRenderAll();
-            setIsLoading(false);
-
-            if (onCanvasChange) {
-              onCanvasChange(canvas.toJSON());
-            }
-          }).catch((error) => {
-            console.error("加载图片失败:", error);
-            setImageError(true);
-            setIsLoading(false);
-          });
-        } else {
+          canvas.requestRenderAll();
+        } catch (err) {
+          console.error("加载内容失败:", err);
+        } finally {
           setIsLoading(false);
         }
-      }
-    }, [initialImageUrl, initialText, initialJson]);
+      };
+
+      loadContent();
+
+    }, [isReady, initialJson, initialImageUrl, initialText, readOnly, width, height]);
 
     return (
-      <div className="shadow-2xl bg-white rounded-lg overflow-hidden relative">
+      <div className={`shadow-2xl bg-white rounded-lg overflow-hidden relative ${className}`}>
+        {/* Fabric 会在 canvas 标签外包一层 div，我们只需渲染 canvas */}
         <canvas ref={canvasEl} />
+        
         {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/80">
-            <div className="text-center">
-              <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-              <p className="text-gray-600 text-sm">加载中...</p>
-            </div>
-          </div>
-        )}
-        {imageError && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-            <div className="text-center">
-              <p className="text-gray-500 text-sm">图片加载失败</p>
+          <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
+            <div className="flex flex-col items-center">
+               <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-2" />
+               <span className="text-sm text-gray-500">画布渲染中...</span>
             </div>
           </div>
         )}

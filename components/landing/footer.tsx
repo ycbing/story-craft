@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Library } from "lucide-react";
 
 export function Footer() {
   return (
@@ -18,6 +18,13 @@ export function Footer() {
 
           {/* 链接组 */}
           <nav className="flex items-center gap-6">
+            <Link
+              href="/dashboard"
+              className="text-gray-600 hover:text-amber-700 dark:text-gray-400 dark:hover:text-amber-400 transition-colors text-sm flex items-center gap-1"
+            >
+              <Library className="w-3 h-3" />
+              我的作品
+            </Link>
             <Link
               href="#features"
               className="text-gray-600 hover:text-amber-700 dark:text-gray-400 dark:hover:text-amber-400 transition-colors text-sm"
