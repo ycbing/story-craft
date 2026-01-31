@@ -14,6 +14,7 @@ import { saveBookAction } from "@/actions/save-book";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -116,11 +117,11 @@ export default function EditorPage() {
         updatePage(currentPageIndex, { aiText: result.refinedText });
         setCurrentPhase("image");
       } else {
-        alert("文案生成失败，请重试");
+        toast.error("文案生成失败，请重试");
       }
     } catch (error) {
       console.error("生成文案失败:", error);
-      alert("文案生成失败，请重试");
+      toast.error("文案生成失败，请重试");
     } finally {
       setGenerating(false);
     }
@@ -150,11 +151,11 @@ export default function EditorPage() {
         updatePage(currentPageIndex, { aiImageUrl: result.imageUrl });
         setCurrentPhase("canvas");
       } else {
-        alert(result.error || "图片生成失败，请重试");
+        toast.error(result.error || "图片生成失败，请重试");
       }
     } catch (error) {
       console.error("生成图片失败:", error);
-      alert("图片生成失败，请重试");
+      toast.error("图片生成失败，请重试");
     } finally {
       setGenerating(false);
     }
@@ -197,15 +198,15 @@ export default function EditorPage() {
       });
 
       if (result.success) {
-        alert("绘本保存成功！");
+        toast.success("绘本保存成功！");
         // TODO: 添加 PDF 导出功能
         router.push("/");
       } else {
-        alert(result.error || "保存失败");
+        toast.error(result.error || "保存失败");
       }
     } catch (error) {
       console.error("保存失败:", error);
-      alert("保存失败，请重试");
+      toast.error("保存失败，请重试");
     }
   };
 

@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Loader2, Sparkles, Palette, User } from "lucide-react";
 import { STYLE_PRESETS, AGE_PRESETS } from "@/lib/constants/style-presets";
+import { toast } from "sonner";
 
 export default function CreatePage() {
   const router = useRouter();
@@ -25,7 +26,7 @@ export default function CreatePage() {
 
   const handleGenerate = async () => {
     if (!userInput.trim()) {
-      alert("请输入故事创意");
+      toast.error("请输入故事创意");
       return;
     }
 
@@ -54,7 +55,7 @@ export default function CreatePage() {
       setWorkflowStep("confirm");
       router.push("/create/confirm");
     } else {
-      alert(result.error || "生成失败，请重试");
+      toast.error(result.error || "生成失败，请重试");
     }
 
     setIsLoading(false);
