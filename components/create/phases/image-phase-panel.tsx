@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Loader2, Image as ImageIcon, RefreshCw, Eye } from "lucide-react";
+import { Loader2, Image as ImageIcon, RefreshCw, Eye, Sparkles } from "lucide-react";
 import Image from "next/image";
 
 interface ImagePhasePanelProps {
@@ -69,9 +69,22 @@ export function ImagePhasePanel({
           )}
         </div>
       ) : (
-        <div className="text-center py-8 text-gray-500">
-          <ImageIcon className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-          <p>图片将显示在这里</p>
+        <div className="text-center py-12 space-y-4">
+          <ImageIcon className="w-16 h-16 mx-auto text-gray-300" />
+          <div className="space-y-2">
+            <p className="text-gray-500">图片将显示在这里</p>
+            {onRegenerate && (
+              <Button
+                onClick={onRegenerate}
+                disabled={isGenerating}
+                size="lg"
+                className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg"
+              >
+                <Sparkles className="w-5 h-5 mr-2" />
+                生成配图
+              </Button>
+            )}
+          </div>
         </div>
       )}
     </Card>

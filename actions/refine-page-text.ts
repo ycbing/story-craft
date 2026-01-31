@@ -3,10 +3,10 @@
 import { generateText, APICallError } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 
-// 创建硅基流动客户端
-const siliconflow = createOpenAI({
-  apiKey: process.env.SILICONFLOW_API_KEY,
-  baseURL: process.env.SILICONFLOW_BASE_URL || "https://api.siliconflow.com/v1",
+// 创建心流客户端
+const iflow = createOpenAI({
+  apiKey: process.env.IFLOW_API_KEY,
+  baseURL: process.env.IFLOW_BASE_URL || "https://api.siliconflow.com/v1",
 });
 
 // 定义输入参数类型
@@ -31,8 +31,8 @@ export async function refinePageTextAction({
 
   try {
     const { text } = await generateText({
-      model: siliconflow.chat(
-        process.env.SILICONFLOW_MODEL! || "gpt-3.5-turbo",
+      model: iflow.chat(
+        process.env.IFLOW_MODEL! || "gpt-3.5-turbo",
       ),
       prompt: `你是一位专业的儿童绘本作家。
 

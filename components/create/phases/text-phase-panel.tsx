@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Loader2, FileText, Edit3, RefreshCw } from "lucide-react";
+import { Loader2, FileText, Edit3, RefreshCw, Sparkles } from "lucide-react";
 
 interface TextPhasePanelProps {
   text: string;
@@ -63,9 +63,22 @@ export function TextPhasePanel({
           <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{text}</p>
         </div>
       ) : (
-        <div className="text-center py-8 text-gray-500">
-          <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-          <p>文案将显示在这里</p>
+        <div className="text-center py-12 space-y-4">
+          <FileText className="w-16 h-16 mx-auto text-gray-300" />
+          <div className="space-y-2">
+            <p className="text-gray-500">文案将显示在这里</p>
+            {onRegenerate && (
+              <Button
+                onClick={onRegenerate}
+                disabled={isGenerating}
+                size="lg"
+                className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg"
+              >
+                <Sparkles className="w-5 h-5 mr-2" />
+                生成文案
+              </Button>
+            )}
+          </div>
         </div>
       )}
     </Card>

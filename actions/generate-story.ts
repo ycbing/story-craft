@@ -4,7 +4,7 @@ import { generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 
 // 创建硅基流动客户端
-const siliconflow = createOpenAI({
+const iflow = createOpenAI({
   apiKey: process.env.IFLOW_API_KEY,
   baseURL: process.env.IFLOW_BASE_URL || "https://api.siliconflow.com/v1",
 });
@@ -44,7 +44,7 @@ export async function generateOutlineAction(config: string | GenerateOutlineConf
 
   try {
     const { text, usage } = await generateText({
-      model: siliconflow.chat(
+      model: iflow.chat(
         process.env.IFLOW_MODEL! || "gpt-3.5-turbo",
       ),
       prompt: `你是一位专业的儿童绘本作家。请根据用户的创意："${userInput}"，创作一个适合 ${targetAudience} 岁儿童阅读的绘本大纲。
