@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { getBooksAction, deleteBookAction } from "@/actions/get-books";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { BookOpen, Clock, CheckCircle2, Trash2, Edit3, Plus, Sparkles, Loader2 } from "lucide-react";
+import { BookOpen, Clock, CheckCircle2, Trash2, Edit3, Plus, Sparkles, Loader2, User, LogOut } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { UserButton } from "@clerk/nextjs";
 
 export interface BookListItem {
   id: string;
@@ -67,29 +68,28 @@ export default function DashboardPage() {
         {/* 头部 */}
         <div className="flex items-center justify-between mb-8">
           <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-3 rounded-2xl shadow-lg">
-                <Sparkles className="w-8 h-8 text-white" />
-              </div>
-              <h1 className="text-3xl font-bold text-gray-800">
-                我的作品
-              </h1>
-            </div>
-            <p className="text-gray-600 ml-14">
+            <h1 className="text-3xl font-bold text-gray-800">
+              我的作品
+            </h1>
+            <p className="text-gray-600">
               管理和继续创作你的绘本
             </p>
           </div>
 
-          <Button
-            asChild
-            size="lg"
-            className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg"
-          >
-            <Link href="/create">
-              <Plus className="w-5 h-5 mr-2" />
-              创建新绘本
-            </Link>
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              asChild
+              size="lg"
+              className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg"
+            >
+              <Link href="/create">
+                <Plus className="w-5 h-5 mr-2" />
+                创建新绘本
+              </Link>
+            </Button>
+
+            <UserButton afterSignOutUrl="/" />
+          </div>
         </div>
 
         {/* 加载状态 */}

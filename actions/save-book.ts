@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { books, pages } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
 
 // 定义前端传来的数据结构
 export interface SaveBookParams {
@@ -21,9 +22,9 @@ export interface SaveBookParams {
 }
 
 export async function saveBookAction(params: SaveBookParams) {
-  // 1. 权限检查 (如果没有 Clerk，暂时硬编码一个 userId)
-  // const { userId } = auth();
-  const userId = "user_2bXyZ_test"; // ⚠️ 测试阶段先写死一个 ID
+  // 1. 权限检查 - 获取当前登录用户 ID
+  const authResult = auth();
+  const userId = authResult?.userId;
 
   if (!userId) return { success: false, error: "未登录" };
 
@@ -52,6 +53,17 @@ export async function saveBookAction(params: SaveBookParams) {
 
         currentBookId = newBook.id;
       } else {
+        // 1.5. 验证书籍所有权
+        const existingBook = await tx
+          .select({ userId: books.userId })
+          .from(books)
+          .where(eq(books.id, currentBookId))
+          .limit(1);
+
+        if (!existingBook.length || existingBook[0].userId !== userId) {
+          throw new Error("无权修改此绘本");
+        }
+
         // 2. 如果有 ID，更新标题和时间
         await tx
           .update(books)

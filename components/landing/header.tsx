@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Library } from "lucide-react";
+import { UserButton } from "@clerk/nextjs";
 
 export function Header() {
   return (
@@ -48,16 +49,20 @@ export function Header() {
             </Link>
           </nav>
 
-          {/* CTA 按钮 */}
-          <Button
-            asChild
-            className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md"
-          >
-            <Link href="/create">
-              开始创作
-              <Sparkles className="w-4 h-4 ml-2" />
-            </Link>
-          </Button>
+          {/* 右侧区域：用户按钮或 CTA */}
+          <div className="flex items-center gap-3">
+            <UserButton afterSignOutUrl="/" />
+
+            <Button
+              asChild
+              className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md"
+            >
+              <Link href="/create">
+                开始创作
+                <Sparkles className="w-4 h-4 ml-2" />
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
     </header>
