@@ -13,14 +13,15 @@ const isAuthRoute = createRouteMatcher([
   "/sign-up(.*)",
 ]);
 
-export default clerkMiddleware((auth, req) => {
+export default clerkMiddleware(async (auth, req) => {
+  const {userId} = await auth()
   // 场景 A: 已登录用户访问 "登录/注册" 页 -> 踢回 Dashboard
-  if (auth().userId && isAuthRoute(req)) {
+  if (userId && isAuthRoute(req)) {
     return Response.redirect(new URL("/dashboard", req.url));
   }
 
   // 场景 B: 未登录用户访问受保护页面 -> 重定向到登录页
-  if (!auth().userId && isProtectedRoute(req)) {
+  if (!userId && isProtectedRoute(req)) {
     const signInUrl = new URL("/sign-in", req.url);
     return Response.redirect(signInUrl);
   }
@@ -29,8 +30,9 @@ export default clerkMiddleware((auth, req) => {
 // 必须导出 Config，否则中间件会对静态资源运行
 export const config = {
   matcher: [
-    "/((?!.*\\..*|_next).*)",
-    "/",
-    "/(api|trpc)(.*)"
+    // Skip Next.js internals and all static files, unless found in search params
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    // Always run for API routes
+    '/(api|trpc)(.*)',
   ],
 };
