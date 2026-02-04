@@ -63,14 +63,8 @@ const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
         height,
         backgroundColor: "#fff",
         selection: !readOnly,
-        renderOnAddRemove: false, // 性能优化：关闭自动渲染，手动 requestRenderAll
+        // renderOnAddRemove: false, // 性能优化：关闭自动渲染，手动 requestRenderAll
       });
-
-      // 修复只读模式的光标
-      if (readOnly) {
-        canvas.defaultCursor = "default";
-        canvas.hoverCursor = "default";
-      }
 
       fabricCanvasRef.current = canvas;
       setIsReady(true); // 标记引擎就绪
@@ -84,33 +78,36 @@ const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
 
       canvas.on("object:modified", handleChange);
       canvas.on("object:added", handleChange);
-      canvas.on("object:removed", handleChange);
 
       // 清理函数
       return () => {
+        setIsReady(false)
         console.log("清理 Fabric 引擎...");
         canvas.off("object:modified", handleChange);
         canvas.off("object:added", handleChange);
-        canvas.off("object:removed", handleChange);
         
         // Fabric v6 dispose 是异步的，但 useEffect cleanup 是同步的
         // 这里主要为了断开引用，具体 DOM 清理由 React 处理，
         // 或者使用 dispose().then() 但要注意不要阻塞 UI
         canvas.dispose(); 
         fabricCanvasRef.current = null;
-        setIsReady(false);
       };
-    }, []); // 空依赖数组，确保只运行一次
+    }, [width, height, readOnly]); // 空依赖数组，确保只运行一次
 
     // 2. 加载内容 (当 Canvas 就绪 或 数据变化时执行)
     useEffect(() => {
-      if (!isReady || !fabricCanvasRef.current) return;
-
+      // 关键：检查 fabricCanvasRef.current 及其内部 context 是否还存在
       const canvas = fabricCanvasRef.current;
+      if (!isReady || !canvas || !fabricCanvasRef.current) return;
+
+      let isMounted = true; // 防止异步操作在组件卸载后执行
       setIsLoading(true);
 
       const loadContent = async () => {
         try {
+          // 在执行 clear 之前再次检查
+          if (!isMounted || !canvas.getContext()) return;
+
           canvas.clear();
           canvas.backgroundColor = "#fff"; // 清除后重置背景
           
@@ -188,17 +185,24 @@ const CanvasEditor = forwardRef<CanvasEditorRef, CanvasEditorProps>(
             }
           }
 
-          canvas.requestRenderAll();
+          if(isMounted) {
+
+            canvas.requestRenderAll();
+          }
         } catch (err) {
           console.error("加载内容失败:", err);
         } finally {
-          setIsLoading(false);
+          if(isMounted) setIsLoading(false);
         }
       };
 
       loadContent();
 
-    }, [isReady, initialJson, initialImageUrl, initialText, readOnly, width, height]);
+      return () => {
+        isMounted = false
+      }
+
+    }, [isReady, initialJson, initialImageUrl, initialText]);
 
     return (
       <div className={`shadow-2xl bg-white rounded-lg overflow-hidden relative ${className}`}>
