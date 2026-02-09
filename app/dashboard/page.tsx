@@ -190,9 +190,24 @@ export default function DashboardPage() {
                         size="sm"
                         className="flex-1 text-amber-700 border-amber-300 hover:bg-amber-50"
                       >
-                        <Link href={`/create/editor?bookId=${book.id}`}>
-                          <Edit3 className="w-4 h-4 mr-1" />
-                          {book.status === "completed" ? "查看" : "继续编辑"}
+                        <Link
+                          href={
+                            book.status === "completed"
+                              ? `/view/${book.id}`
+                              : `/create/editor?bookId=${book.id}`
+                          }
+                        >
+                          {book.status === "completed" ? (
+                            <>
+                              <BookOpen className="w-4 h-4 mr-1" />
+                              查看
+                            </>
+                          ) : (
+                            <>
+                              <Edit3 className="w-4 h-4 mr-1" />
+                              继续编辑
+                            </>
+                          )}
                         </Link>
                       </Button>
                       <Button

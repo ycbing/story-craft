@@ -1,70 +1,41 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useBookStore } from "@/lib/store/use-book-store";
 import { ProgressIndicator } from "@/components/create/progress-indicator";
-import { TextPhasePanel } from "@/components/create/phases/text-phase-panel";
-import { ImagePhasePanel } from "@/components/create/phases/image-phase-panel";
-import { CanvasPhasePanel } from "@/components/create/phases/canvas-phase-panel";
-import { PreviewPhasePanel } from "@/components/create/phases/preview-phase-panel";
 import { refinePageTextAction } from "@/actions/refine-page-text";
 import { generatePageImageAction } from "@/actions/generate-page-image";
 import { saveBookAction } from "@/actions/save-book";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Wand2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-
-// 相位标签
-const PHASES = [
-  { id: "text", label: "文案", icon: "📝" },
-  { id: "image", label: "配图", icon: "🎨" },
-  { id: "canvas", label: "画布", icon: "🖼️" },
-  { id: "preview", label: "预览", icon: "✅" },
-] as const;
 
 export default function EditorPage() {
   const router = useRouter();
-  const canvasPhaseRef = useRef<{
-    saveCanvas: () => Record<string, unknown> | null;
-  }>(null);
 
   // Store state
   const pages = useBookStore((state) => state.pages);
   const currentPageIndex = useBookStore((state) => state.currentPageIndex);
   const title = useBookStore((state) => state.title);
   const config = useBookStore((state) => state.config);
-  const workflow = useBookStore((state) => state.workflow);
 
   // Store actions
   const setCurrentPageIndex = useBookStore(
     (state) => state.setCurrentPageIndex,
   );
   const updatePage = useBookStore((state) => state.updatePage);
-  const setCurrentPhase = useBookStore((state) => state.setCurrentPhase);
-  const setGenerating = useBookStore((state) => state.setGenerating);
   const nextPage = useBookStore((state) => state.nextPage);
 
   // Local state
   const [editedText, setEditedText] = useState("");
-  const [isEditing, setIsEditing] = useState(false);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(
     null,
   );
-  const [generatedPrompt, setGeneratedPrompt] = useState<string>("");
-  const [canvasJson, setCanvasJson] = useState<Record<string, unknown> | null>(
-    null,
-  );
+  const [isGeneratingText, setIsGeneratingText] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
   const currentPage = pages[currentPageIndex];
 
@@ -80,17 +51,8 @@ export default function EditorPage() {
     if (currentPage) {
       setEditedText(currentPage.aiText || "");
       setGeneratedImageUrl(currentPage.aiImageUrl);
-      setCanvasJson(currentPage.canvasJson);
-      // 如果页面已生成，跳到预览，否则从文案开始
-      if (currentPage.isGenerated) {
-        setCurrentPhase("preview");
-      } else if (currentPage.aiText) {
-        setCurrentPhase("image");
-      } else {
-        setCurrentPhase("text");
-      }
     }
-  }, [currentPageIndex, currentPage, setCurrentPhase]);
+  }, [currentPageIndex, currentPage]);
 
   if (!currentPage) {
     return (
@@ -102,7 +64,7 @@ export default function EditorPage() {
 
   // 生成文案
   const handleGenerateText = async () => {
-    setGenerating(true);
+    setIsGeneratingText(true);
     try {
       const result = await refinePageTextAction({
         originalSummary: currentPage.outlineSummary || "",
@@ -115,27 +77,27 @@ export default function EditorPage() {
       if (result.success && result.refinedText) {
         setEditedText(result.refinedText);
         updatePage(currentPageIndex, { aiText: result.refinedText });
-        setCurrentPhase("image");
+        toast.success("文案生成成功！");
       } else {
-        toast.error("文案生成失败，请重试");
+        toast.error(result.error || "文案生成失败，请重试");
       }
     } catch (error) {
       console.error("生成文案失败:", error);
       toast.error("文案生成失败，请重试");
     } finally {
-      setGenerating(false);
+      setIsGeneratingText(false);
     }
   };
 
   // 保存编辑的文案
   const handleSaveTextEdit = () => {
     updatePage(currentPageIndex, { aiText: editedText });
-    setIsEditing(false);
+    toast.success("文案已保存");
   };
 
   // 生成图片
   const handleGenerateImage = async () => {
-    setGenerating(true);
+    setIsGeneratingImage(true);
     try {
       const result = await generatePageImageAction({
         refinedText: editedText || currentPage.aiText || "",
@@ -147,9 +109,8 @@ export default function EditorPage() {
 
       if (result.success && result.imageUrl) {
         setGeneratedImageUrl(result.imageUrl);
-        setGeneratedPrompt(result.revisedPrompt || "");
         updatePage(currentPageIndex, { aiImageUrl: result.imageUrl });
-        setCurrentPhase("canvas");
+        toast.success("配图生成成功！");
       } else {
         toast.error(result.error || "图片生成失败，请重试");
       }
@@ -157,14 +118,8 @@ export default function EditorPage() {
       console.error("生成图片失败:", error);
       toast.error("图片生成失败，请重试");
     } finally {
-      setGenerating(false);
+      setIsGeneratingImage(false);
     }
-  };
-
-  // 画布变化时保存
-  const handleCanvasChange = (json: Record<string, unknown>) => {
-    setCanvasJson(json);
-    updatePage(currentPageIndex, { canvasJson: json });
   };
 
   // 确认当前页
@@ -192,14 +147,13 @@ export default function EditorPage() {
           pageNumber: p.id,
           aiText: p.aiText,
           aiImageUrl: p.aiImageUrl,
-          canvasJson: p.canvasJson,
+          canvasJson: null,
           outlineSummary: p.outlineSummary,
         })),
       });
 
       if (result.success) {
         toast.success("绘本保存成功！");
-        // TODO: 添加 PDF 导出功能
         router.push("/");
       } else {
         toast.error(result.error || "保存失败");
@@ -252,188 +206,129 @@ export default function EditorPage() {
           </div>
         </div>
 
-        {/* 相位标签 */}
-        <Card className="p-2">
-          <div className="flex gap-2">
-            {PHASES.map((phase) => (
-              <button
-                key={phase.id}
-                onClick={() => setCurrentPhase(phase.id as any)}
-                disabled={workflow.isGenerating}
-                className={`
-                  flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all
-                  ${
-                    workflow.currentPhase === phase.id
-                      ? "bg-amber-500 text-white shadow-md"
-                      : "bg-white text-gray-600 hover:bg-amber-50"
-                  }
-                  ${workflow.isGenerating ? "opacity-50 cursor-not-allowed" : ""}
-                `}
-              >
-                <span>{phase.icon}</span>
-                <span className="hidden sm:inline">{phase.label}</span>
-              </button>
-            ))}
-          </div>
-        </Card>
-
-        {/* 主内容区 */}
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* 左侧：当前页面信息 */}
-          <div className="lg:col-span-1 space-y-4">
-            <Card className="p-4">
-              <h3 className="font-semibold text-gray-800 mb-2">
-                第 {currentPage.id} 页
-              </h3>
-              <p className="text-sm text-gray-500 mb-3">原始摘要</p>
-              <p className="text-sm text-gray-700 bg-amber-50 rounded-lg p-3">
+        {/* 主内容区：左右分栏 */}
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* 左侧：文案区域 */}
+          <div className="space-y-4">
+            {/* 原始摘要 */}
+            <Card className="p-4 bg-amber-50 border-amber-200">
+              <p className="text-sm text-gray-500 mb-2">原始摘要</p>
+              <p className="text-sm text-gray-700">
                 {currentPage.outlineSummary}
               </p>
             </Card>
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-800">📝 文案</h3>
+                <Button
+                  onClick={handleGenerateText}
+                  disabled={isGeneratingText}
+                  size="sm"
+                  variant="outline"
+                  className="text-amber-700 border-amber-300 hover:bg-amber-50"
+                >
+                  <Wand2 className="w-4 h-4 mr-1" />
+                  {editedText ? "重新生成" : "生成文案"}
+                </Button>
+              </div>
 
-            {/* 自动提示当前需要做什么 */}
-            <Card className="p-4 bg-blue-50 border-blue-200">
-              <h4 className="font-medium text-blue-800 mb-2">当前任务</h4>
-              <ul className="text-sm text-blue-700 space-y-1">
-                {workflow.currentPhase === "text" && (
-                  <>
-                    <li>{`1. 点击"生成文案"让 AI 创作这一页的文字`}</li>
-                    <li>2. 可以编辑生成的文案</li>
-                    <li>{`3. 满意后点击"生成配图"`}</li>
-                  </>
-                )}
-                {workflow.currentPhase === "image" && (
-                  <>
-                    <li>1. AI 已根据文案生成配图</li>
-                    <li>2. 查看图片效果</li>
-                    <li>3. 如不满意可重新生成</li>
-                    <li>{`4. 满意后点击"下一步"`}</li>
-                  </>
-                )}
-                {workflow.currentPhase === "canvas" && (
-                  <>
-                    <li>1. 在画布上调整图片和文字的位置</li>
-                    <li>2. 可以添加、删除或修改元素</li>
-                    <li>3. 编辑会自动保存</li>
-                    <li>{`4. 完成后点击"预览"`}</li>
-                  </>
-                )}
-                {workflow.currentPhase === "preview" && (
-                  <>
-                    <li>1. 预览最终效果</li>
-                    <li>2. 如需修改可返回上一步</li>
-                    <li>{`3. 满意后点击"确认继续"`}</li>
-                  </>
-                )}
-              </ul>
+              <Textarea
+                value={editedText}
+                onChange={(e) => setEditedText(e.target.value)}
+                placeholder="点击「生成文案」让 AI 创作这一页的文字，或直接输入..."
+                rows={12}
+                className="resize-none"
+                disabled={isGeneratingText}
+              />
+
+              <div className="flex gap-2 mt-4">
+                <Button
+                  onClick={handleSaveTextEdit}
+                  disabled={
+                    !editedText || isGeneratingText || isGeneratingImage
+                  }
+                  className="flex-1 bg-amber-500 hover:bg-amber-600"
+                >
+                  保存文案
+                </Button>
+                <Button
+                  onClick={handleGenerateImage}
+                  disabled={
+                    !editedText || isGeneratingText || isGeneratingImage
+                  }
+                  variant="outline"
+                  className="flex-1 border-amber-300 text-amber-700 hover:bg-amber-50"
+                >
+                  生成配图 →
+                </Button>
+              </div>
             </Card>
           </div>
 
-          {/* 右侧：相位面板 */}
-          <div className="lg:col-span-2">
-            {workflow.currentPhase === "text" && (
-              <div className="space-y-4">
-                <TextPhasePanel
-                  text={editedText}
-                  isGenerating={workflow.isGenerating}
-                  onEdit={() => setIsEditing(true)}
-                  onRegenerate={handleGenerateText}
-                />
-                {editedText && (
-                  <div className="flex justify-center">
-                    <Button
-                      onClick={() => setCurrentPhase("image")}
-                      size="lg"
-                      className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg"
-                    >
-                      生成配图 →
-                    </Button>
+          {/* 右侧：配图区域 */}
+          <div className="space-y-4">
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-800">🎨 配图</h3>
+                <Button
+                  onClick={handleGenerateImage}
+                  disabled={isGeneratingImage || !editedText}
+                  size="sm"
+                  variant="outline"
+                  className="text-amber-700 border-amber-300 hover:bg-amber-50"
+                >
+                  <RefreshCw className="w-4 h-4 mr-1" />
+                  {generatedImageUrl ? "重新生成" : "生成配图"}
+                </Button>
+              </div>
+
+              <div className="aspect-square bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+                {isGeneratingImage ? (
+                  <div className="text-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-amber-500 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">正在生成中...</p>
+                  </div>
+                ) : generatedImageUrl ? (
+                  <img
+                    src={generatedImageUrl}
+                    alt={`第 ${currentPage.id} 页配图`}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="text-center text-gray-400 p-6">
+                    <p className="text-4xl mb-2">🖼️</p>
+                    <p className="text-sm">生成文案后点击「生成配图」</p>
                   </div>
                 )}
               </div>
-            )}
 
-            {workflow.currentPhase === "image" && (
-              <div className="space-y-4">
-                <ImagePhasePanel
-                  imageUrl={generatedImageUrl}
-                  prompt={generatedPrompt}
-                  isGenerating={workflow.isGenerating}
-                  onRegenerate={handleGenerateImage}
-                />
-                {generatedImageUrl && (
-                  <div className="flex justify-center">
-                    <Button
-                      onClick={() => setCurrentPhase("canvas")}
-                      size="lg"
-                      className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg"
-                    >
-                      编辑画布 →
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {workflow.currentPhase === "canvas" && (
-              <div className="space-y-4">
-                <CanvasPhasePanel
-                  ref={canvasPhaseRef}
-                  imageUrl={generatedImageUrl}
-                  text={editedText}
-                  canvasJson={canvasJson}
-                  onCanvasChange={handleCanvasChange}
-                />
-                <div className="flex justify-center">
+              {generatedImageUrl && (
+                <div className="mt-4">
                   <Button
-                    onClick={() => setCurrentPhase("preview")}
-                    size="lg"
-                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg"
+                    onClick={handleApprovePage}
+                    disabled={isGeneratingImage}
+                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg"
                   >
-                    预览效果 →
+                    {currentPageIndex === pages.length - 1
+                      ? "完成并保存"
+                      : "确认继续下一页 →"}
                   </Button>
                 </div>
-              </div>
-            )}
+              )}
+            </Card>
 
-            {workflow.currentPhase === "preview" && (
-              <PreviewPhasePanel
-                canvasJson={canvasJson}
-                pageNumber={currentPage.id}
-                totalPages={pages.length}
-                onApprove={handleApprovePage}
-                onRegenerateText={() => setCurrentPhase("text")}
-                onRegenerateImage={() => setCurrentPhase("image")}
-                onEditCanvas={() => setCurrentPhase("canvas")}
-              />
-            )}
+            {/* 提示信息 */}
+            <Card className="p-4 bg-blue-50 border-blue-200">
+              <h4 className="font-medium text-blue-800 mb-2">操作提示</h4>
+              <ul className="text-sm text-blue-700 space-y-1">
+                <li>1. 先生成或编辑文案</li>
+                <li>2. 点击「生成配图」创建插图</li>
+                <li>3. 满意后点击「确认继续」</li>
+              </ul>
+            </Card>
           </div>
         </div>
       </div>
-
-      {/* 编辑文案对话框 */}
-      <Dialog open={isEditing} onOpenChange={setIsEditing}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>编辑文案</DialogTitle>
-            <DialogDescription>
-              修改第 {currentPage.id} 页的文案内容
-            </DialogDescription>
-          </DialogHeader>
-          <Textarea
-            value={editedText}
-            onChange={(e) => setEditedText(e.target.value)}
-            rows={6}
-            placeholder="输入这一页的文案..."
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditing(false)}>
-              取消
-            </Button>
-            <Button onClick={handleSaveTextEdit}>保存</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

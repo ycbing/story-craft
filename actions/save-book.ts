@@ -1,9 +1,9 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { books, pages } from "@/lib/db/schema";
+import { books, pages, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { auth } from "@clerk/nextjs/server";
+import { currentUser } from "@clerk/nextjs/server";
 
 // 定义前端传来的数据结构
 export interface SaveBookParams {
@@ -23,10 +23,28 @@ export interface SaveBookParams {
 
 export async function saveBookAction(params: SaveBookParams) {
   // 1. 权限检查 - 获取当前登录用户 ID
-  const authResult = auth();
-  const userId = authResult?.userId;
+  const user = await currentUser();
+  const userId = user?.id;
+  const userEmail = user?.emailAddresses[0]?.emailAddress;
 
-  if (!userId) return { success: false, error: "未登录" };
+  if (!userId || !userEmail) return { success: false, error: "未登录" };
+
+  // 2. 确保用户在本地 users 表中存在
+  const existingUser = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  // 如果用户不存在，创建用户记录
+  if (!existingUser.length) {
+    await db.insert(users).values({
+      id: userId,
+      email: userEmail,
+      credits: 5,
+    });
+    console.log(`创建新用户: ${userEmail}`);
+  }
 
   console.log(
     `正在保存绘本: ${params.title}, 页数: ${params.pagesData.length}`,

@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { books, pages } from "@/lib/db/schema";
 import { desc, eq } from "drizzle-orm";
-import { auth } from "@clerk/nextjs/server";
+import { currentUser } from "@clerk/nextjs/server";
 
 export interface BookListItem {
   id: string;
@@ -20,8 +20,8 @@ export interface BookListItem {
 export async function getBooksAction() {
   try {
     // 获取当前登录用户 ID
-    const authResult = auth();
-    const userId = authResult?.userId;
+    const user = await currentUser();
+    const userId = user?.id;
     if (!userId) {
       return { success: false, error: "未登录", data: [] };
     }
@@ -67,8 +67,8 @@ export async function getBooksAction() {
 export async function deleteBookAction(bookId: string) {
   try {
     // 获取当前登录用户 ID
-    const authResult = auth();
-    const userId = authResult?.userId;
+    const user = await currentUser();
+    const userId = user?.id;
     if (!userId) {
       return { success: false, error: "未登录" };
     }
