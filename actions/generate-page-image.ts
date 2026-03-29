@@ -1,9 +1,8 @@
 "use server";
 
-import { generateImageAction } from "./generate-image";
+import { callZhipuImage, enhanceImagePrompt } from "@/lib/zhipu";
 
-// 定义输入参数类型
-export interface GeneratePageImageParams {
+interface GeneratePageImageParams {
   refinedText: string;
   originalSummary: string;
   stylePrompt: string;
@@ -22,35 +21,34 @@ export async function generatePageImageAction({
 
   console.log(`正在生成第 ${pageNumber} 页图片`);
 
-  // 组合场景描述：使用润色后的文案作为主要描述，同时保留原始摘要作为参考
-  const sceneDescription = `${refinedText}\n\nAdditional context: ${originalSummary}`;
+  try {
+    // 合并润色后文案和原始摘要作为场景描述
+    const sceneDescription = `${refinedText}\n\nAdditional context: ${originalSummary}`;
 
-  // 调用现有的 generateImageAction
-  const result = await generateImageAction({
-    sceneSummary: sceneDescription,
-    stylePreset: stylePrompt,
-    characterDesc: mainCharacterDesc,
-  });
+    // 用 GLM-4 优化提示词
+    const enhancedPrompt = await enhanceImagePrompt({
+      sceneSummary: sceneDescription,
+      stylePreset: stylePrompt,
+      characterDesc: mainCharacterDesc,
+      pageNumber,
+    });
 
-  if (result.success) {
-    // 返回成功结果，包含组装的提示词供用户查看
-    const revisedPrompt = `
-Illustration style: ${stylePrompt}.
-Scene description: ${sceneDescription}.
-Key character visual details (MUST stay consistent): ${mainCharacterDesc}.
-Atmosphere: warm, storybook feel, detailed background lighting.
-    `.trim();
+    console.log("优化后的提示词:", enhancedPrompt.substring(0, 200) + "...");
+
+    // 生成图片
+    const imageUrl = await callZhipuImage(enhancedPrompt);
 
     return {
       success: true,
-      imageUrl: result.imageUrl,
-      revisedPrompt,
+      imageUrl,
+      revisedPrompt: enhancedPrompt,
+    };
+  } catch (error) {
+    console.error("图片生成失败:", error);
+
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "图片生成失败",
     };
   }
-
-  // 返回失败结果
-  return {
-    success: false,
-    error: result.error,
-  };
 }

@@ -1,23 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { books, pages } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
-import { currentUser } from "@clerk/nextjs/server";
+import { eq, and } from "drizzle-orm";
+import { currentUser } from "@/lib/mock-auth";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ bookId: string }> }
 ) {
   try {
-    // 验证用户登录
-    const user = await currentUser();
-    if (!user?.id) {
-      return NextResponse.json({ error: "未登录" }, { status: 401 });
-    }
+    const user = currentUser;
 
     const { bookId } = await params;
 
-    // 获取绘本信息
     const bookData = await db
       .select({
         id: books.id,
@@ -37,12 +34,10 @@ export async function GET(
 
     const book = bookData[0];
 
-    // 验证权限
     if (book.userId !== user.id) {
       return NextResponse.json({ error: "无权访问此绘本" }, { status: 403 });
     }
 
-    // 获取绘本的所有页面
     const pagesData = await db
       .select({
         pageNumber: pages.pageNumber,
@@ -65,6 +60,42 @@ export async function GET(
     console.error("获取绘本失败:", error);
     return NextResponse.json(
       { error: "获取绘本失败" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ bookId: string }> }
+) {
+  try {
+    const user = currentUser;
+    const { bookId } = await params;
+
+    // 验证书籍存在且属于当前用户
+    const bookData = await db
+      .select({ id: books.id, userId: books.userId })
+      .from(books)
+      .where(eq(books.id, bookId))
+      .limit(1);
+
+    if (!bookData.length) {
+      return NextResponse.json({ error: "绘本不存在" }, { status: 404 });
+    }
+
+    if (bookData[0].userId !== user.id) {
+      return NextResponse.json({ error: "无权删除此绘本" }, { status: 403 });
+    }
+
+    // 删除绘本（pages 会因为 CASCADE 自动删除）
+    await db.delete(books).where(eq(books.id, bookId));
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("删除绘本失败:", error);
+    return NextResponse.json(
+      { error: "删除绘本失败" },
       { status: 500 }
     );
   }

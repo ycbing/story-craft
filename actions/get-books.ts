@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { books, pages } from "@/lib/db/schema";
 import { desc, eq } from "drizzle-orm";
-import { currentUser } from "@clerk/nextjs/server";
+import { currentUser } from "@/lib/mock-auth";
 
 export interface BookListItem {
   id: string;
@@ -11,22 +11,17 @@ export interface BookListItem {
   status: "draft" | "completed";
   coverUrl: string | null;
   pageCount: number;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
   stylePrompt: string | null;
   mainCharacterDesc: string | null;
 }
 
 export async function getBooksAction() {
   try {
-    // 获取当前登录用户 ID
-    const user = await currentUser();
-    const userId = user?.id;
-    if (!userId) {
-      return { success: false, error: "未登录", data: [] };
-    }
+    const user = currentUser;
+    const userId = user.id;
 
-    // 获取用户的所有绘本
     const userBooks = await db
       .select({
         id: books.id,
@@ -42,7 +37,6 @@ export async function getBooksAction() {
       .where(eq(books.userId, userId))
       .orderBy(desc(books.updatedAt));
 
-    // 获取每本书的页面数量
     const booksWithPageCount = await Promise.all(
       userBooks.map(async (book) => {
         const pagesCount = await db
@@ -66,14 +60,9 @@ export async function getBooksAction() {
 
 export async function deleteBookAction(bookId: string) {
   try {
-    // 获取当前登录用户 ID
-    const user = await currentUser();
-    const userId = user?.id;
-    if (!userId) {
-      return { success: false, error: "未登录" };
-    }
+    const user = currentUser;
+    const userId = user.id;
 
-    // 先验证绘本是否属于当前用户
     const book = await db
       .select({ userId: books.userId })
       .from(books)
@@ -84,7 +73,6 @@ export async function deleteBookAction(bookId: string) {
       return { success: false, error: "无权删除此绘本" };
     }
 
-    // 删除绘本（由于有 cascade 设置，页面会自动删除）
     await db.delete(books).where(eq(books.id, bookId));
 
     return { success: true };

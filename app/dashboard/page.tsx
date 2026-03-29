@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { BookOpen, Clock, CheckCircle2, Trash2, Edit3, Plus, Sparkles, Loader2, User, LogOut } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { UserButton } from "@clerk/nextjs";
+// Clerk removed - local mode
 
 export interface BookListItem {
   id: string;
@@ -16,8 +16,8 @@ export interface BookListItem {
   status: "draft" | "completed";
   coverUrl: string | null;
   pageCount: number;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
   stylePrompt: string | null;
   mainCharacterDesc: string | null;
 }
@@ -54,7 +54,7 @@ export default function DashboardPage() {
     }
   };
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: string | Date) => {
     return new Date(date).toLocaleDateString("zh-CN", {
       year: "numeric",
       month: "short",
@@ -88,7 +88,6 @@ export default function DashboardPage() {
               </Link>
             </Button>
 
-            <UserButton afterSignOutUrl="/" />
           </div>
         </div>
 

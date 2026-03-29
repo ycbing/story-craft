@@ -1,50 +1,42 @@
 import {
-  pgTable,
-  serial,
+  sqliteTable,
   text,
-  timestamp,
   integer,
-  jsonb,
-  boolean,
-  uuid,
-} from "drizzle-orm/pg-core";
+  real,
+} from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
 
 // ----------------------------------------------------------------------
 // 1. 用户表 (Users)
-// 虽然 Clerk 管理认证，但我们需要一个本地表来存"积分"或"会员状态"
 // ----------------------------------------------------------------------
-export const users = pgTable("users", {
-  id: text("id").primaryKey(), // 这里直接存 Clerk 的 User ID (user_2N...)
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(), // 本地用户 ID
   email: text("email").notNull(),
-  credits: integer("credits").default(5).notNull(), // 初始送5个积分
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  credits: integer("credits").default(5).notNull(),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
 });
 
 // ----------------------------------------------------------------------
 // 2. 绘本表 (Books)
-// 一本书的基本元数据
 // ----------------------------------------------------------------------
-export const books = pgTable("books", {
-  id: uuid("id").defaultRandom().primaryKey(), // 使用 UUID，生成的 URL 更难被猜到
+export const books = sqliteTable("books", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id")
     .notNull()
-    .references(() => users.id), // 关联用户
+    .references(() => users.id),
 
   title: text("title").notNull().default("未命名绘本"),
-  coverUrl: text("cover_url"), // 封面图
+  coverUrl: text("cover_url"),
 
-  // 核心配置：这决定了整本书的 AI 风格
-  stylePrompt: text("style_prompt"), // 例如: "Ghibli style, watercolor"
-  mainCharacterDesc: text("main_character_desc"), // 例如: "A small black cat"
+  stylePrompt: text("style_prompt"),
+  mainCharacterDesc: text("main_character_desc"),
 
   status: text("status", { enum: ["draft", "completed"] }).default("draft"),
 
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
+  updatedAt: text("updated_at").$defaultFn(() => new Date().toISOString()),
 });
 
-// 定义 User 和 Book 的关联关系 (Drizzle 语法)
 export const usersRelations = relations(users, ({ many }) => ({
   books: many(books),
 }));
@@ -58,30 +50,25 @@ export const booksRelations = relations(books, ({ one, many }) => ({
 }));
 
 // ----------------------------------------------------------------------
-// 3. 页面表 (Pages) - 核心中的核心
-// 每一页都包含：AI生成的图文 + 你的 Fabric 画布状态
+// 3. 页面表 (Pages)
 // ----------------------------------------------------------------------
-export const pages = pgTable("pages", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  bookId: uuid("book_id")
+export const pages = sqliteTable("pages", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  bookId: text("book_id")
     .notNull()
-    .references(() => books.id, { onDelete: "cascade" }), // 书删了，页也没了
+    .references(() => books.id, { onDelete: "cascade" }),
 
-  pageNumber: integer("page_number").notNull(), // 第几页
+  pageNumber: integer("page_number").notNull(),
 
-  // AI 生成的原始素材 (用于以后重新生成或参考)
-  prompt: text("prompt"), // 当时生成这一页用的 Prompt
-  aiText: text("ai_text"), // AI 写的文案
-  aiImageUrl: text("ai_image_url"), // AI 生成的底图
+  prompt: text("prompt"),
+  aiText: text("ai_text"),
+  aiImageUrl: text("ai_image_url"),
 
-  // 🔥 关键字段：Fabric.js 的完整状态
-  // 我们使用 Postgres 的 jsonb 类型，它可以存巨大的 JSON 对象，而且查询速度快
-  canvasState: jsonb("canvas_state"),
+  canvasState: text("canvas_state", { mode: "json" }),
 
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
 });
 
-// 定义 Page 和 Book 的关联
 export const pagesRelations = relations(pages, ({ one }) => ({
   book: one(books, {
     fields: [pages.bookId],

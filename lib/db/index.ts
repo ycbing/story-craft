@@ -1,6 +1,25 @@
-import { Pool } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-serverless";
+import Database from "better-sqlite3";
+import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
+import path from "path";
 
-const pool = new Pool({ connectionString: process.env.POSTGRES_URL!});
-export const db = drizzle(pool, { schema });
+let _db: BetterSQLite3Database<typeof schema> | null = null;
+
+function getDbPath(): string {
+  return process.env.DB_PATH || path.join(process.cwd(), "local.db");
+}
+
+export const db: BetterSQLite3Database<typeof schema> = new Proxy({} as BetterSQLite3Database<typeof schema>, {
+  get(_target, prop, receiver) {
+    if (!_db) {
+      const sqlite = new Database(getDbPath());
+      sqlite.pragma("journal_mode = WAL");
+      _db = drizzle(sqlite, { schema });
+    }
+    const value = Reflect.get(_db, prop, receiver);
+    if (typeof value === "function") {
+      return value.bind(_db);
+    }
+    return value;
+  },
+});
