@@ -91,15 +91,22 @@ export default function ViewBookPage() {
     (index: number) => {
       if (!book || isTransitioning) return;
       if (index < 0 || index >= book.pages.length) return;
-      if (index === currentPageIndex) return;
+
+      // 双页模式下，非封面页需要对齐到奇数起始页
+      let targetIndex = index;
+      if (isDualPage && index !== 0) {
+        targetIndex = index % 2 === 1 ? index : index - 1;
+      }
+
+      if (targetIndex === currentPageIndex) return;
       setIsTransitioning(true);
       setTimeout(() => {
-        setCurrentPageIndex(index);
+        setCurrentPageIndex(targetIndex);
         setFadeKey((k) => k + 1);
         setIsTransitioning(false);
       }, 200);
     },
-    [book, currentPageIndex, isTransitioning]
+    [book, currentPageIndex, isTransitioning, isDualPage]
   );
 
   const handlePrevPage = () => {
@@ -171,15 +178,17 @@ export default function ViewBookPage() {
   const getVisiblePages = (): number[] => {
     if (!book || !isDualPage) return [currentPageIndex];
 
-    // 双页模式：封面单页，后面双页
     const pages = book.pages;
+
+    // 双页模式：封面（第0页）单独一页
     if (currentPageIndex === 0) return [0];
 
-    // 偶数索引从 currentPageIndex 开始
-    const start = currentPageIndex % 2 === 0 ? currentPageIndex : currentPageIndex - 1;
+    // 封面后的页面按"左右对开"分组：[1,2], [3,4], [5,6]...
+    // 确定当前所在的"对开组"的起始页（奇数）
+    const groupStart = currentPageIndex % 2 === 1 ? currentPageIndex : currentPageIndex - 1;
     const result: number[] = [];
-    if (start < pages.length) result.push(start);
-    if (start + 1 < pages.length) result.push(start + 1);
+    if (groupStart < pages.length) result.push(groupStart);
+    if (groupStart + 1 < pages.length) result.push(groupStart + 1);
     return result;
   };
 
