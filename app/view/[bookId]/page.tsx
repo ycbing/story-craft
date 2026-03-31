@@ -50,18 +50,7 @@ export default function ViewBookPage() {
   const [fadeKey, setFadeKey] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // 双页模式
-  const [isDualPage, setIsDualPage] = useState(false);
 
-  // 检测屏幕宽度
-  useEffect(() => {
-    const checkWidth = () => {
-      setIsDualPage(window.innerWidth >= 768);
-    };
-    checkWidth();
-    window.addEventListener("resize", checkWidth);
-    return () => window.removeEventListener("resize", checkWidth);
-  }, []);
 
   useEffect(() => {
     if (bookId) {
@@ -91,39 +80,20 @@ export default function ViewBookPage() {
     (index: number) => {
       if (!book || isTransitioning) return;
       if (index < 0 || index >= book.pages.length) return;
-
-      // 双页模式下，非封面页需要对齐到奇数起始页
-      let targetIndex = index;
-      if (isDualPage && index !== 0) {
-        targetIndex = index % 2 === 1 ? index : index - 1;
-      }
-
-      if (targetIndex === currentPageIndex) return;
+      if (index === currentPageIndex) return;
       setIsTransitioning(true);
       setTimeout(() => {
-        setCurrentPageIndex(targetIndex);
+        setCurrentPageIndex(index);
         setFadeKey((k) => k + 1);
         setIsTransitioning(false);
       }, 200);
     },
-    [book, currentPageIndex, isTransitioning, isDualPage]
+    [book, currentPageIndex, isTransitioning]
   );
 
-  const handlePrevPage = () => {
-    if (isDualPage) {
-      goToPage(currentPageIndex - 2);
-    } else {
-      goToPage(currentPageIndex - 1);
-    }
-  };
+  const handlePrevPage = () => goToPage(currentPageIndex - 1);
 
-  const handleNextPage = () => {
-    if (isDualPage) {
-      goToPage(currentPageIndex + 2);
-    } else {
-      goToPage(currentPageIndex + 1);
-    }
-  };
+  const handleNextPage = () => goToPage(currentPageIndex + 1);
 
   // 键盘翻页
   const handleKeyPress = useCallback(
@@ -135,7 +105,7 @@ export default function ViewBookPage() {
       if (e.key === "ArrowLeft") handlePrevPage();
       else if (e.key === "ArrowRight") handleNextPage();
     },
-    [currentPageIndex, book, lightboxOpen, isDualPage]
+    [currentPageIndex, book, lightboxOpen]
   );
 
   useEffect(() => {
@@ -174,26 +144,8 @@ export default function ViewBookPage() {
     setLightboxOpen(true);
   };
 
-  // 获取当前可见页面索引范围
-  const getVisiblePages = (): number[] => {
-    if (!book || !isDualPage) return [currentPageIndex];
-
-    const pages = book.pages;
-
-    // 双页模式：封面（第0页）单独一页
-    if (currentPageIndex === 0) return [0];
-
-    // 封面后的页面按"左右对开"分组：[1,2], [3,4], [5,6]...
-    // 确定当前所在的"对开组"的起始页（奇数）
-    const groupStart = currentPageIndex % 2 === 1 ? currentPageIndex : currentPageIndex - 1;
-    const result: number[] = [];
-    if (groupStart < pages.length) result.push(groupStart);
-    if (groupStart + 1 < pages.length) result.push(groupStart + 1);
-    return result;
-  };
-
   // 渲染单个页面
-  const renderSinglePage = (page: PageData, index: number, isFirst = false) => {
+  const renderSinglePage = (page: PageData, index: number) => {
     return (
       <Card
         key={page.pageNumber}
@@ -226,20 +178,11 @@ export default function ViewBookPage() {
 
         {/* 文案区域 */}
         <div className="p-6 bg-white min-h-[100px]">
-          {isFirst ? (
-            // 封面：显示书名大标题
-            <div className="text-center py-4">
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                {book?.title}
-              </h2>
-            </div>
-          ) : (
-            <div className="max-w-2xl mx-auto">
-              <p className="text-base text-gray-700 leading-relaxed whitespace-pre-wrap">
-                {page.aiText || "暂无文案"}
-              </p>
-            </div>
-          )}
+          <div className="max-w-2xl mx-auto">
+            <p className="text-base text-gray-700 leading-relaxed whitespace-pre-wrap">
+              {page.aiText || "暂无文案"}
+            </p>
+          </div>
         </div>
       </Card>
     );
@@ -272,20 +215,12 @@ export default function ViewBookPage() {
     );
   }
 
-  const visibleIndices = getVisiblePages();
   const canPrev = currentPageIndex > 0;
-  const canNext =
-    isDualPage
-      ? currentPageIndex < book.pages.length - 1
-      : currentPageIndex < book.pages.length - 1;
+  const canNext = currentPageIndex < book.pages.length - 1;
 
   // 页面指示器：缩略图小方块
   const pageIndicators = book.pages.map((page, index) => {
-    const isActive =
-      isDualPage
-        ? index === currentPageIndex ||
-          (index === currentPageIndex + 1 && currentPageIndex !== 0)
-        : index === currentPageIndex;
+    const isActive = index === currentPageIndex;
     return (
       <button
         key={index}
@@ -333,12 +268,7 @@ export default function ViewBookPage() {
               {book.title}
             </h1>
             <p className="text-sm text-gray-500">
-              第 {currentPageIndex + 1}
-              {isDualPage && visibleIndices.length === 2
-                ? ` - ${currentPageIndex + 2}`
-                : ""}
-              {" / "}
-              {book.pages.length} 页
+              第 {currentPageIndex + 1} / {book.pages.length} 页
             </p>
           </div>
 
@@ -364,13 +294,11 @@ export default function ViewBookPage() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div
           key={fadeKey}
-          className={`flex justify-center gap-6 transition-opacity duration-300 ${
+          className={`flex justify-center transition-opacity duration-300 ${
             isTransitioning ? "opacity-0" : "opacity-100"
           }`}
         >
-          {visibleIndices.map((idx) =>
-            renderSinglePage(book.pages[idx], idx, idx === 0)
-          )}
+          {renderSinglePage(book.pages[currentPageIndex], currentPageIndex)}
         </div>
 
         {/* 翻页控制 */}
