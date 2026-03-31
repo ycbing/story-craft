@@ -1,25 +1,25 @@
 import {
-  sqliteTable,
+  pgTable,
   text,
   integer,
-  real,
-} from "drizzle-orm/sqlite-core";
+  timestamp,
+} from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // ----------------------------------------------------------------------
 // 1. 用户表 (Users)
 // ----------------------------------------------------------------------
-export const users = sqliteTable("users", {
-  id: text("id").primaryKey(), // 本地用户 ID
+export const users = pgTable("users", {
+  id: text("id").primaryKey(),
   email: text("email").notNull(),
   credits: integer("credits").default(5).notNull(),
-  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
+  createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(() => new Date()),
 });
 
 // ----------------------------------------------------------------------
 // 2. 绘本表 (Books)
 // ----------------------------------------------------------------------
-export const books = sqliteTable("books", {
+export const books = pgTable("books", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id")
     .notNull()
@@ -33,8 +33,8 @@ export const books = sqliteTable("books", {
 
   status: text("status", { enum: ["draft", "completed"] }).default("draft"),
 
-  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
-  updatedAt: text("updated_at").$defaultFn(() => new Date().toISOString()),
+  createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(() => new Date()),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(() => new Date()),
 });
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -52,7 +52,7 @@ export const booksRelations = relations(books, ({ one, many }) => ({
 // ----------------------------------------------------------------------
 // 3. 页面表 (Pages)
 // ----------------------------------------------------------------------
-export const pages = sqliteTable("pages", {
+export const pages = pgTable("pages", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   bookId: text("book_id")
     .notNull()
@@ -64,9 +64,9 @@ export const pages = sqliteTable("pages", {
   aiText: text("ai_text"),
   aiImageUrl: text("ai_image_url"),
 
-  canvasState: text("canvas_state", { mode: "json" }),
+  canvasState: text("canvas_state"),
 
-  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()),
+  createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(() => new Date()),
 });
 
 export const pagesRelations = relations(pages, ({ one }) => ({

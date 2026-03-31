@@ -1,20 +1,20 @@
-import Database from "better-sqlite3";
-import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import * as schema from "./schema";
-import path from "path";
 
-let _db: BetterSQLite3Database<typeof schema> | null = null;
+let _db: NodePgDatabase<typeof schema> | null = null;
 
-function getDbPath(): string {
-  return process.env.DB_PATH || path.join(process.cwd(), "local.db");
+function getPool(): Pool {
+  return new Pool({
+    connectionString: process.env.DATABASE_URL || "postgresql://storycraft:storycraft123@localhost:5432/storycraft",
+  });
 }
 
-export const db: BetterSQLite3Database<typeof schema> = new Proxy({} as BetterSQLite3Database<typeof schema>, {
+export const db: NodePgDatabase<typeof schema> = new Proxy({} as NodePgDatabase<typeof schema>, {
   get(_target, prop, receiver) {
     if (!_db) {
-      const sqlite = new Database(getDbPath());
-      sqlite.pragma("journal_mode = WAL");
-      _db = drizzle(sqlite, { schema });
+      const pool = getPool();
+      _db = drizzle(pool, { schema });
     }
     const value = Reflect.get(_db, prop, receiver);
     if (typeof value === "function") {

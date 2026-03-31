@@ -46,6 +46,8 @@ export async function getBooksAction() {
 
         return {
           ...book,
+          createdAt: book.createdAt?.toISOString() ?? new Date().toISOString(),
+          updatedAt: book.updatedAt?.toISOString() ?? new Date().toISOString(),
           pageCount: pagesCount.length || 0,
         } as BookListItem;
       })

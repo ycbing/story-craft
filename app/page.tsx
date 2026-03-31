@@ -47,7 +47,10 @@ async function getRecentBooks(): Promise<BookItem[]> {
     })
   );
 
-  return booksWithCount;
+  return booksWithCount.map(b => ({
+    ...b,
+    createdAt: b.createdAt?.toISOString() ?? null,
+  }));
 }
 
 export default async function HomePage() {
