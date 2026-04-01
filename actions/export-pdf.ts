@@ -2,9 +2,8 @@
 
 import { db } from "@/lib/db";
 import { books, pages } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 
-// 定义输入参数类型
 export interface ExportPdfParams {
   bookId: string;
   includeCover?: boolean;
@@ -19,22 +18,26 @@ export async function exportPdfAction({
   console.log(`正在导出绘本 PDF: ${bookId}`);
 
   try {
-    // 1. 从数据库获取书籍数据
-    const book = await db.query.books.findFirst({
-      where: eq(books.id, bookId),
-      with: {
-        pages: {
-          orderBy: (pages, { asc }) => [asc(pages.pageNumber)],
-        },
-      },
-    });
+    // 1. 获取书籍
+    const [book] = await db
+      .select()
+      .from(books)
+      .where(eq(books.id, bookId))
+      .limit(1);
 
     if (!book) {
       return { success: false, error: "未找到该绘本" };
     }
 
-    // 2. 验证所有页面是否都已生成
-    const incompletePages = book.pages.filter(
+    // 2. 获取页面
+    const pagesData = await db
+      .select()
+      .from(pages)
+      .where(eq(pages.bookId, bookId))
+      .orderBy(asc(pages.pageNumber));
+
+    // 3. 验证所有页面是否都已生成
+    const incompletePages = pagesData.filter(
       (p) => !p.aiImageUrl || !p.canvasState
     );
     if (incompletePages.length > 0) {
@@ -44,14 +47,12 @@ export async function exportPdfAction({
       };
     }
 
-    // 3. 返回所有需要的数据，让客户端生成 PDF
-    // 注意：实际 PDF 生成在客户端进行，因为 canvas.toDataURL() 需要在浏览器环境
     return {
       success: true,
       data: {
         bookId: book.id,
         title: book.title,
-        pages: book.pages.map((p) => ({
+        pages: pagesData.map((p) => ({
           pageNumber: p.pageNumber,
           aiText: p.aiText,
           canvasState: p.canvasState,

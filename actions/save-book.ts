@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { books, pages, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { currentUser } from "@/lib/mock-auth";
+import { auth } from "@clerk/nextjs/server";
 
 export interface SaveBookParams {
   bookId?: string;
@@ -21,9 +21,10 @@ export interface SaveBookParams {
 }
 
 export async function saveBookAction(params: SaveBookParams) {
-  const user = currentUser;
-  const userId = user.id;
-  const userEmail = user.email;
+  const { userId } = await auth();
+  if (!userId) {
+    return { success: false, error: "未登录" };
+  }
 
   try {
     // 1. 确保用户存在
@@ -36,10 +37,10 @@ export async function saveBookAction(params: SaveBookParams) {
     if (!existingUser.length) {
       await db.insert(users).values({
         id: userId,
-        email: userEmail,
+        email: "", // Clerk 不直接暴露邮箱，可后续通过 webhook 同步
         credits: 5,
       });
-      console.log(`创建新用户: ${userEmail}`);
+      console.log(`创建新用户: ${userId}`);
     }
 
     console.log(`正在保存绘本: ${params.title}, 页数: ${params.pagesData.length}`);

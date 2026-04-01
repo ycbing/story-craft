@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { books, pages } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { currentUser } from "@/lib/mock-auth";
+import { auth } from "@clerk/nextjs/server";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +11,10 @@ export async function GET(
   { params }: { params: Promise<{ bookId: string }> }
 ) {
   try {
-    const user = currentUser;
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "未登录" }, { status: 401 });
+    }
 
     const { bookId } = await params;
 
@@ -34,7 +37,7 @@ export async function GET(
 
     const book = bookData[0];
 
-    if (book.userId !== user.id) {
+    if (book.userId !== userId) {
       return NextResponse.json({ error: "无权访问此绘本" }, { status: 403 });
     }
 
@@ -70,7 +73,10 @@ export async function DELETE(
   { params }: { params: Promise<{ bookId: string }> }
 ) {
   try {
-    const user = currentUser;
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "未登录" }, { status: 401 });
+    }
     const { bookId } = await params;
 
     // 验证书籍存在且属于当前用户
@@ -84,7 +90,7 @@ export async function DELETE(
       return NextResponse.json({ error: "绘本不存在" }, { status: 404 });
     }
 
-    if (bookData[0].userId !== user.id) {
+    if (bookData[0].userId !== userId) {
       return NextResponse.json({ error: "无权删除此绘本" }, { status: 403 });
     }
 

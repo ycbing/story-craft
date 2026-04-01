@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { books, pages } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
 import puppeteer from "puppeteer-core";
 
 // 强制动态渲染，避免 build 时访问数据库
@@ -156,9 +157,11 @@ export async function GET(
   { params }: { params: Promise<{ bookId: string }> }
 ) {
   try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "未登录" }, { status: 401 });
+    }
     const { bookId } = await params;
-
-    // 读取绘本数据
     const bookData = await db
       .select()
       .from(books)

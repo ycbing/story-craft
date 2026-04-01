@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { books, pages } from "@/lib/db/schema";
 import { desc, eq } from "drizzle-orm";
-import { currentUser } from "@/lib/mock-auth";
+import { auth } from "@clerk/nextjs/server";
 
 export interface BookListItem {
   id: string;
@@ -19,8 +19,10 @@ export interface BookListItem {
 
 export async function getBooksAction() {
   try {
-    const user = currentUser;
-    const userId = user.id;
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: "未登录", data: [] };
+    }
 
     const userBooks = await db
       .select({
@@ -38,7 +40,7 @@ export async function getBooksAction() {
       .orderBy(desc(books.updatedAt));
 
     const booksWithPageCount = await Promise.all(
-      userBooks.map(async (book) => {
+      userBooks.map(async (book: any) => {
         const pagesCount = await db
           .select({ count: pages.id })
           .from(pages)
@@ -62,8 +64,10 @@ export async function getBooksAction() {
 
 export async function deleteBookAction(bookId: string) {
   try {
-    const user = currentUser;
-    const userId = user.id;
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: "未登录" };
+    }
 
     const book = await db
       .select({ userId: books.userId })

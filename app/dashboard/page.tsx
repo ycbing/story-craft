@@ -5,10 +5,9 @@ import { useRouter } from "next/navigation";
 import { getBooksAction, deleteBookAction } from "@/actions/get-books";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { BookOpen, Clock, CheckCircle2, Trash2, Edit3, Plus, Sparkles, Loader2, User, LogOut } from "lucide-react";
+import { BookOpen, Clock, CheckCircle2, Trash2, Edit3, Plus, Sparkles, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-// Clerk removed - local mode
 
 export interface BookListItem {
   id: string;

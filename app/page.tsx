@@ -2,12 +2,13 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { books, pages } from "@/lib/db/schema";
 import { desc, eq, sql } from "drizzle-orm";
-import { currentUser } from "@/lib/mock-auth";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { Sparkles, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Footer as FooterSection } from "@/components/landing";
 import { BookCardGrid } from "@/components/book-card-grid";
 import { EmptyBooks } from "@/components/empty-books";
+import { Header } from "@/components/landing/header";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +22,9 @@ interface BookItem {
   pageCount: number;
 }
 
-async function getRecentBooks(): Promise<BookItem[]> {
-  const user = currentUser;
+async function getRecentBooks(userId: string | null): Promise<BookItem[]> {
+  if (!userId) return [];
+
   const userBooks = await db
     .select({
       id: books.id,
@@ -33,7 +35,7 @@ async function getRecentBooks(): Promise<BookItem[]> {
       stylePrompt: books.stylePrompt,
     })
     .from(books)
-    .where(eq(books.userId, user.id))
+    .where(eq(books.userId, userId))
     .orderBy(desc(books.updatedAt))
     .limit(12);
 
@@ -54,32 +56,13 @@ async function getRecentBooks(): Promise<BookItem[]> {
 }
 
 export default async function HomePage() {
-  const books = await getRecentBooks();
+  const { userId } = await auth();
+  const books = await getRecentBooks(userId);
 
   return (
     <div className="min-h-screen selection:bg-orange-200 selection:text-orange-900 bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 transition-colors duration-500">
       {/* ── Header ── */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-amber-100 dark:border-amber-900/20">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-2 rounded-xl shadow">
-              <Sparkles className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-amber-700 to-orange-700 bg-clip-text text-transparent dark:from-amber-400 dark:to-orange-400">
-              Story Craft
-            </span>
-          </Link>
-          <Button
-            asChild
-            className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md"
-          >
-            <Link href="/create">
-              开始创作
-              <Sparkles className="w-4 h-4 ml-2" />
-            </Link>
-          </Button>
-        </div>
-      </header>
+      <Header />
 
       <main className="overflow-x-hidden">
         {/* ── Hero ── */}
@@ -119,34 +102,36 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {/* ── 我的绘本 ── */}
-        <section className="max-w-7xl mx-auto px-6 py-12">
-          <div className="flex items-center justify-between mb-8">
-            <div className="space-y-1">
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-                <BookOpen className="w-6 h-6 text-amber-600" />
-                我的绘本
-              </h2>
-              <p className="text-gray-500 dark:text-gray-400">最近创建的绘本作品</p>
+        {/* ── 我的绘本（仅登录用户可见）── */}
+        {userId && (
+          <section className="max-w-7xl mx-auto px-6 py-12">
+            <div className="flex items-center justify-between mb-8">
+              <div className="space-y-1">
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                  <BookOpen className="w-6 h-6 text-amber-600" />
+                  我的绘本
+                </h2>
+                <p className="text-gray-500 dark:text-gray-400">最近创建的绘本作品</p>
+              </div>
+              {books.length > 0 && (
+                <Button
+                  asChild
+                  className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md"
+                >
+                  <Link href="/create">
+                    创建新绘本
+                  </Link>
+                </Button>
+              )}
             </div>
-            {books.length > 0 && (
-              <Button
-                asChild
-                className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md"
-              >
-                <Link href="/create">
-                  创建新绘本
-                </Link>
-              </Button>
-            )}
-          </div>
 
-          {books.length === 0 ? (
-            <EmptyBooks />
-          ) : (
-            <BookCardGrid books={books} />
-          )}
-        </section>
+            {books.length === 0 ? (
+              <EmptyBooks />
+            ) : (
+              <BookCardGrid books={books} />
+            )}
+          </section>
+        )}
       </main>
 
       {/* ── Footer ── */}

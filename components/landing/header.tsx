@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Library } from "lucide-react";
+import { UserButton } from "@clerk/nextjs";
 
 export function Header() {
   return (
@@ -50,6 +51,8 @@ export function Header() {
 
           {/* 右侧区域 */}
           <div className="flex items-center gap-3">
+            <UserButton />
+
             <Button
               asChild
               className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md"
