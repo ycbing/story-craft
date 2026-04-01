@@ -37,7 +37,7 @@ export async function saveBookAction(params: SaveBookParams) {
     if (!existingUser.length) {
       await db.insert(users).values({
         id: userId,
-        email: "", // Clerk 不直接暴露邮箱，可后续通过 webhook 同步
+        email: "",
         credits: 5,
       });
       console.log(`创建新用户: ${userId}`);
@@ -45,67 +45,65 @@ export async function saveBookAction(params: SaveBookParams) {
 
     console.log(`正在保存绘本: ${params.title}, 页数: ${params.pagesData.length}`);
 
-    // 2. 异步 transaction（PostgreSQL）
-    const result = await db.transaction(async (tx) => {
-      let currentBookId = params.bookId;
+    let currentBookId = params.bookId;
 
+    if (!currentBookId) {
+      // 新建绘本
+      const inserted = await db
+        .insert(books)
+        .values({
+          userId,
+          title: params.title,
+          stylePrompt: params.stylePrompt || null,
+          mainCharacterDesc: params.mainCharacterDesc || null,
+          status: params.status || "draft",
+        })
+        .returning({ id: books.id });
+
+      currentBookId = inserted[0]?.id;
       if (!currentBookId) {
-        const inserted = await tx
-          .insert(books)
-          .values({
-            userId,
-            title: params.title,
-            stylePrompt: params.stylePrompt || null,
-            mainCharacterDesc: params.mainCharacterDesc || null,
-            status: params.status || "draft",
-          })
-          .returning({ id: books.id });
+        throw new Error("创建绘本失败");
+      }
+    } else {
+      // 更新绘本
+      const existingBook = await db
+        .select({ userId: books.userId })
+        .from(books)
+        .where(eq(books.id, currentBookId))
+        .limit(1);
 
-        currentBookId = inserted[0]?.id;
-        if (!currentBookId) {
-          throw new Error("创建绘本失败");
-        }
-      } else {
-        const existingBook = await tx
-          .select({ userId: books.userId })
-          .from(books)
-          .where(eq(books.id, currentBookId))
-          .limit(1);
-
-        if (!existingBook.length || existingBook[0].userId !== userId) {
-          throw new Error("无权修改此绘本");
-        }
-
-        await tx.update(books)
-          .set({
-            title: params.title,
-            stylePrompt: params.stylePrompt || null,
-            mainCharacterDesc: params.mainCharacterDesc || null,
-            status: params.status || "draft",
-            updatedAt: new Date(),
-          })
-          .where(eq(books.id, currentBookId));
-
-        await tx.delete(pages).where(eq(pages.bookId, currentBookId));
+      if (!existingBook.length || existingBook[0].userId !== userId) {
+        throw new Error("无权修改此绘本");
       }
 
-      if (params.pagesData.length > 0) {
-        await tx.insert(pages).values(
-          params.pagesData.map((p) => ({
-            bookId: currentBookId!,
-            pageNumber: p.pageNumber,
-            prompt: p.outlineSummary || "",
-            aiText: p.aiText,
-            aiImageUrl: p.aiImageUrl,
-            canvasState: p.canvasJson ? JSON.stringify(p.canvasJson) : null,
-          })),
-        );
-      }
+      await db.update(books)
+        .set({
+          title: params.title,
+          stylePrompt: params.stylePrompt || null,
+          mainCharacterDesc: params.mainCharacterDesc || null,
+          status: params.status || "draft",
+          updatedAt: new Date(),
+        })
+        .where(eq(books.id, currentBookId));
 
-      return { bookId: currentBookId };
-    });
+      await db.delete(pages).where(eq(pages.bookId, currentBookId));
+    }
 
-    return { success: true, bookId: result.bookId };
+    // 批量插入页面
+    if (params.pagesData.length > 0) {
+      await db.insert(pages).values(
+        params.pagesData.map((p) => ({
+          bookId: currentBookId!,
+          pageNumber: p.pageNumber,
+          prompt: p.outlineSummary || "",
+          aiText: p.aiText,
+          aiImageUrl: p.aiImageUrl,
+          canvasState: p.canvasJson ? JSON.stringify(p.canvasJson) : null,
+        })),
+      );
+    }
+
+    return { success: true, bookId: currentBookId };
   } catch (error) {
     console.error("保存失败:", error);
     return {
